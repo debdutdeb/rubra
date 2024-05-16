@@ -1,14 +1,17 @@
 # Standard Library
 import asyncio
+import os
 import json
 import logging
-import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
+
+from pymongo.server_api import ServerApi
+
+import aioredis
 
 # Third Party
-import aioredis
 import requests
 from beanie import init_beanie
 from celery import Celery
@@ -87,7 +90,7 @@ from core.tools.knowledge.vector_db.milvus.operations import (
     delete_docs,
     drop_collection,
 )
-from fastapi import FastAPI, Form, HTTPException, UploadFile, WebSocket
+from fastapi import FastAPI, Form, HTTPException, UploadFile, WebSocket, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.websockets import WebSocketState
@@ -104,9 +107,7 @@ from .helpers import (
     generate_thread_id,
 )
 
-litellm_host = os.getenv("LITELLM_HOST", "localhost")
-redis_host = os.getenv("REDIS_HOST", "localhost")
-mongodb_host = os.getenv("MONGODB_HOST", "localhost")
+import core.config as config
 
 app = FastAPI()
 
@@ -125,23 +126,22 @@ app.add_middleware(
 )
 
 # MongoDB Configurationget
-MONGODB_URL = f"mongodb://{mongodb_host}:27017"
-DATABASE_NAME = "rubra_db"
-LITELLM_URL = f"http://{litellm_host}:8002"
+LITELLM_URL = config.get_litellm_url()
+LITELLM_MASTER_KEY = os.getenv("LITELLM_MASTER_KEY", "")
 HEADERS = {"accept": "application/json", "Content-Type": "application/json"}
 
 # Initialize MongoDB client
-mongo_client = AsyncIOMotorClient(MONGODB_URL)
-database = mongo_client[DATABASE_NAME]
+mongo_client = AsyncIOMotorClient(config.get_mongo_url(), server_api=ServerApi("1"))
+database = mongo_client[config.get_mongo_database_name()]
 
-celery_app = Celery(broker=f"redis://{redis_host}:6379/0")
+celery_app = Celery(config.get_redis_url())
+
+redis = aioredis.from_url(config.get_redis_url())
 
 logging.basicConfig(level=logging.INFO)
 
-
 def get_database():
     return database
-
 
 @app.on_event("startup")
 async def on_startup():
@@ -202,9 +202,6 @@ async def on_startup():
 @app.get("/get_api_key_status", tags=["API Keys"])
 async def get_api_key_status():
     try:
-        redis = await aioredis.from_url(
-            f"redis://{redis_host}:6379/0", encoding="utf-8", decode_responses=True
-        )
         openai_key = await redis.get("OPENAI_API_KEY")
         anthropic_key = await redis.get("ANTHROPIC_API_KEY")
 
@@ -225,10 +222,6 @@ async def get_api_key_status():
 @app.post("/set_api_keys", tags=["API Keys"])
 async def set_api_key_status(api_keys: ApiKeysUpdateModel):
     try:
-        redis = await aioredis.from_url(
-            f"redis://{redis_host}:6379/0", encoding="utf-8", decode_responses=True
-        )
-
         logging.info("Setting API keys")
         logging.info(api_keys)
 
@@ -751,9 +744,6 @@ async def list_messages(
 
 async def redis_subscriber(channel, timeout=1):
     logging.info(f"Connecting to Redis and subscribing to channel: {channel}")
-    redis = await aioredis.from_url(
-        f"redis://{redis_host}:6379/0", encoding="utf-8", decode_responses=True
-    )
     pubsub = redis.pubsub()
     await pubsub.subscribe(channel)
 
@@ -778,12 +768,8 @@ async def listen_for_task_status(
     task_status_channel, status_update_event, thread_id, run_id
 ):
     logging.info(f"Listening for task status on channel: {task_status_channel}")
-    redis = None
     pubsub = None
     try:
-        redis = await aioredis.from_url(
-            f"redis://{redis_host}:6379/0", encoding="utf-8", decode_responses=True
-        )
         pubsub = redis.pubsub()
         await pubsub.subscribe(task_status_channel)
 
@@ -1023,7 +1009,7 @@ def convert_model_info_to_oai_model(obj, predefined_models):
 
 def litellm_list_model() -> ListModelsResponse:
     try:
-        client = OpenAI(base_url=LITELLM_URL, api_key="abc")
+        client = OpenAI(base_url=LITELLM_URL, api_key=LITELLM_MASTER_KEY)
         models_data = client.models.list().data
         models_data = sorted(models_data, key=lambda x: x.id)
         predefined_models = [convert_to_model(m) for m in models_data]
@@ -1589,6 +1575,44 @@ async def chat_completion(body: CreateChatCompletionRequest):
     else:
         return response
 
+async def perform_health_check(*, readiness=False) -> None:
+    await redis.ping()
+    await mongo_client.admin.command("ping")
+
+    response: Union[requests.Response, None]
+
+    healthy = False
+
+    if readiness:
+        response = requests.get(f"{LITELLM_URL}/health/readiness", {
+        })
+
+        healthy = response.json().get("status", "") == "healthy"
+    else:
+        response = requests.get(f"{LITELLM_URL}/health/liveliness", {
+        })
+
+        healthy = response.content == "I'm alive!"
+
+    if not healthy:
+        raise Exception("litellm not ready: " + str(response.json()))
+
+
+@app.get("/healthz/readiness", status_code=status.HTTP_204_NO_CONTENT)
+async def check_readiness(response: Response) -> None:
+    try:
+        await perform_health_check(readiness=True)
+    except Exception as e:
+        print("error checking for health:", e)
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+@app.get("/healthz/liveness", status_code=status.HTTP_204_NO_CONTENT)
+async def check_liveness(response: Response) -> None:
+    try:
+        await perform_health_check(readiness=True)
+    except Exception as e:
+        print("error checking for health:", e)
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
 def data_generator(response):
     """
