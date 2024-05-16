@@ -56,3 +56,15 @@ def get_litellm_url() -> str:
     port = getenv("LITELLM_PORT")
 
     return f"http://{host}:{port}"
+
+@cache
+def get_vector_db_url() -> str:
+    url = getenv("VECTOR_DB_URL")
+    if url:
+        return url
+
+    host = getenv("VECTOR_DB_HOST", "localhost")
+    port = getenv("VECTOR_DB_PORT", 8010)
+    name = getenv("VECTOR_DB_NAME", "similarity_search")
+
+    return f"http://{host}:{port}/{name}"

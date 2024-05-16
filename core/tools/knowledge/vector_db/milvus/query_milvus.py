@@ -131,6 +131,9 @@ class Milvus(VectorStore):
         # Create the connection to the server
         if connection_args is None:
             connection_args = DEFAULT_MILVUS_CONNECTION
+        else:
+            # fill anything not passed like "default" port
+            connection_args = {**DEFAULT_MILVUS_CONNECTION, **connection_args}
         self.alias = self._create_connection_alias(connection_args)
         self.col: Optional[Collection] = None
 

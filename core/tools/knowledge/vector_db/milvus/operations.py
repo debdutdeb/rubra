@@ -33,10 +33,10 @@ def load_collection(collection_name: str) -> Milvus:
         embedding_function=CustomEmbeddings(),
         collection_name=collection_name,
         connection_args={
-            "host": MILVUS_HOST,
-            "port": "19530",
-            "user": "username",
-            "password": "password",
+            "host": os.getenv("MILVUS_HOST", "localhost"),
+            "port": os.getenv("MILVUS_PORT", "19530"),
+            "user": os.getenv("MILVUS_USER", os.getenv("MILVUS_USERNAME", "")),
+            "password": os.getenv("MILVUS_PASS", os.getenv("MILVUS_PASSWORD", "")),
         },
         index_params={
             "metric_type": "IP",

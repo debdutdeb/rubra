@@ -19,11 +19,6 @@ top_k_match = 10
 app = FastAPI()
 
 
-@app.on_event("startup")
-async def app_startup():
-    pass
-
-
 @app.post("/add_texts")
 async def add_texts_embeddings(
     collection_name: str,
