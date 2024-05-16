@@ -5,7 +5,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, Callable
 
 from pymongo.server_api import ServerApi
 
@@ -1575,44 +1575,46 @@ async def chat_completion(body: CreateChatCompletionRequest):
     else:
         return response
 
-async def perform_health_check(*, readiness=False) -> None:
-    await redis.ping()
-    await mongo_client.admin.command("ping")
+def _health_endpoint_wrapper(fn: Callable):
+    async def _health(response: Response):
+        try:
+            await redis.ping()
+            await mongo_client.admin.command("ping")
 
-    response: Union[requests.Response, None]
+            if asyncio.iscoroutinefunction(fn):
+                await fn()
+            else:
+                fn()
+        except Exception as e:
+            print("error checking for health:", e)
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            return {"status": "not healthy"}
 
-    healthy = False
-
-    if readiness:
-        response = requests.get(f"{LITELLM_URL}/health/readiness", {
-        })
-
-        healthy = response.json().get("status", "") == "healthy"
-    else:
-        response = requests.get(f"{LITELLM_URL}/health/liveliness", {
-        })
-
-        healthy = response.content == "I'm alive!"
-
-    if not healthy:
-        raise Exception("litellm not ready: " + str(response.json()))
-
+    return _health
 
 @app.get("/healthz/readiness", status_code=status.HTTP_204_NO_CONTENT)
-async def check_readiness(response: Response) -> None:
-    try:
-        await perform_health_check(readiness=True)
-    except Exception as e:
-        print("error checking for health:", e)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+@_health_endpoint_wrapper
+def is_litellm_ready() -> None:
+    response = requests.get(f"{LITELLM_URL}/health/readiness", { })
+
+    if response.json().get("status", "") != "healthy":
+        raise Exception("litellm not ready: " + str(response.json()))
+
+    # it is important to make sure auth is working
+    response = requests.get(f"{LITELLM_URL}/health", headers={ "Authorization": f"Bearer {LITELLM_MASTER_KEY}" })
+
+    if not response.ok:
+        raise Exception("could not grab litellm health: "+response.text)
+
 
 @app.get("/healthz/liveness", status_code=status.HTTP_204_NO_CONTENT)
-async def check_liveness(response: Response) -> None:
-    try:
-        await perform_health_check(readiness=True)
-    except Exception as e:
-        print("error checking for health:", e)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+@_health_endpoint_wrapper
+def is_litellm_healthy() -> None:
+    response = requests.get(f"{LITELLM_URL}/health/liveliness", { })
+
+    if response.text != "\"I'm alive!\"":
+        raise Exception("litellm not healthy: " + response.content.decode())
+
 
 def data_generator(response):
     """
