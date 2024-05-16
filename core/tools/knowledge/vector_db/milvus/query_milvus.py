@@ -133,7 +133,7 @@ class Milvus(VectorStore):
             connection_args = DEFAULT_MILVUS_CONNECTION
         else:
             # fill anything not passed like "default" port
-            connection_args = {**DEFAULT_MILVUS_CONNECTION, **connection_args}
+            connection_args = {**connection_args, **DEFAULT_MILVUS_CONNECTION}
         self.alias = self._create_connection_alias(connection_args)
         self.col: Optional[Collection] = None
 
