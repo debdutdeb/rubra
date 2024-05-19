@@ -10,8 +10,11 @@ from core.tools.knowledge.vector_db.milvus.operations import (
     drop_collection,
     get_similar_match,
     load_collection,
+    milvus_connection_alias,
 )
 from fastapi import FastAPI
+
+from pymilvus import connections
 
 model = {}
 top_re_rank = 5
@@ -51,4 +54,4 @@ def ping():
 
 @app.get("/healthz")
 def healthcheck():
-    pass
+    connections.connect(alias=milvus_connection_alias) # alias makes sure pool isn't filled with random junk connections
