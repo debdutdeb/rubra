@@ -2,7 +2,7 @@
 import json
 import os
 
-import core.config as config
+import core.config as configs
 
 # Third Party
 import requests
@@ -40,7 +40,7 @@ def file_knowledge_search_api(query: str, assistant_id: str):
         }
     )
 
-    response = requests.post(config.get_vector_db_url(), headers=headers, data=data)
+    response = requests.post(configs.vector_db_url, headers=headers, data=data)
     res = response.json()["response"]
     txt = ""
     for r in res:

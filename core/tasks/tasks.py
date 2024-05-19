@@ -33,10 +33,10 @@ from core.local_model import RubraLocalAgent
 from openai import OpenAI
 from pymongo import MongoClient
 
-import core.config as config
+import core.config as configs
 
-redis_client = cast(redis.Redis, redis.Redis.from_url(config.get_redis_url())) # annoyingly from_url returns None, not Self
-app = Celery("tasks", broker=config.get_redis_url())
+redis_client = cast(redis.Redis, redis.Redis.from_url(configs.get_redis_url())) # annoyingly from_url returns None, not Self
+app = Celery("tasks", broker=configs.get_redis_url())
 
 app.config_from_object("core.tasks.celery_config")
 app.autodiscover_tasks(["core.tasks"])  # Explicitly discover tasks in 'app' package
@@ -48,13 +48,13 @@ mongo_client: MongoClient
 @signals.worker_process_init.connect
 def setup_mongo_connection(*args, **kwargs):
     global mongo_client
-    mongo_client = MongoClient(config.get_mongo_url())
+    mongo_client = MongoClient(configs.get_mongo_url())
 
 
 def create_assistant_message(
     thread_id, assistant_id, run_id, content_text, role=Role7.assistant.value
 ):
-    db = mongo_client[config.get_mongo_database_name()]
+    db = mongo_client[configs.get_mongo_database_name()]
 
     # Generate a unique ID for the message
     message_id = f"msg_{uuid.uuid4().hex[:6]}"
@@ -213,10 +213,10 @@ def form_openai_tools(tools, assistant_id: str):
 def execute_chat_completion(assistant_id, thread_id, redis_channel, run_id):
     try:
         oai_client = OpenAI(
-            base_url=config.get_litellm_url(),
+            base_url=configs.get_litellm_url(),
             api_key=os.getenv("LITELLM_MASTER_KEY"),  # point to litellm server
         )
-        db = mongo_client[config.get_mongo_database_name()]
+        db = mongo_client[configs.get_mongo_database_name()]
 
         # Fetch assistant and thread messages synchronously
         assistant = db.assistants.find_one({"id": assistant_id})
@@ -458,7 +458,7 @@ def execute_asst_file_create(file_id: str, assistant_id: str):
     from langchain.text_splitter import RecursiveCharacterTextSplitter
 
     try:
-        db = mongo_client[config.get_mongo_database_name()]
+        db = mongo_client[configs.get_mongo_database_name()]
         collection_name = assistant_id
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
         parsed_text = ""

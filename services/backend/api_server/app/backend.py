@@ -107,7 +107,7 @@ from .helpers import (
     generate_thread_id,
 )
 
-import core.config as config
+import core.config as configs
 
 app = FastAPI()
 
@@ -126,17 +126,17 @@ app.add_middleware(
 )
 
 # MongoDB Configurationget
-LITELLM_URL = config.get_litellm_url()
+LITELLM_URL = configs.litellm_url
 LITELLM_MASTER_KEY = os.getenv("LITELLM_MASTER_KEY", "")
 HEADERS = {"accept": "application/json", "Content-Type": "application/json"}
 
 # Initialize MongoDB client
-mongo_client = AsyncIOMotorClient(config.get_mongo_url(), server_api=ServerApi("1"))
-database = mongo_client[config.get_mongo_database_name()]
+mongo_client = AsyncIOMotorClient(configs.mongo_url, server_api=ServerApi("1"))
+database = mongo_client[configs.mongo_url]
 
-celery_app = Celery(config.get_redis_url())
+celery_app = Celery(configs.redis_url)
 
-redis = aioredis.from_url(config.get_redis_url())
+redis = aioredis.from_url(configs.redis_url)
 
 logging.basicConfig(level=logging.INFO)
 

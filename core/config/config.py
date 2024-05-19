@@ -1,12 +1,8 @@
-from functools import cache
-
 from os import getenv
 
-@cache
 def get_mongo_database_name():
     return getenv("MONGO_DATABASE", "rubra_db")
 
-@cache
 def get_mongo_url() -> str:
     url = getenv("MONGO_URL")
     if url:
@@ -29,7 +25,6 @@ def get_mongo_url() -> str:
 
     return f"mongodb://{host}:{port}/{database}"
 
-@cache
 def get_redis_url() -> str:
     url = getenv("REDIS_URL")
     if url:
@@ -46,7 +41,6 @@ def get_redis_url() -> str:
 
     return f"redis://{host}:{port}/{database}" 
 
-@cache
 def get_litellm_url() -> str:
     url = getenv("LITELLM_URL")
     if url:
@@ -57,7 +51,6 @@ def get_litellm_url() -> str:
 
     return f"http://{host}:{port}"
 
-@cache
 def get_vector_db_url() -> str:
     url = getenv("VECTOR_DB_URL")
     if url:
@@ -68,3 +61,13 @@ def get_vector_db_url() -> str:
     name = getenv("VECTOR_DB_NAME", "similarity_search")
 
     return f"http://{host}:{port}/{name}"
+
+mongo_database = get_mongo_database_name()
+
+mongo_url = get_mongo_url()
+
+litellm_url = get_litellm_url()
+
+vector_db_url = get_vector_db_url()
+
+redis_url = get_redis_url()
