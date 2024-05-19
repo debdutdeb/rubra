@@ -48,3 +48,7 @@ def text_similarity_match(query: Query):
 @app.get("/ping")
 def ping():
     return {"response": "Pong!"}
+
+@app.get("/healthz")
+def healthcheck():
+    pass
