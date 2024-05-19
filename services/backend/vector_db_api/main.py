@@ -12,9 +12,9 @@ from core.tools.knowledge.vector_db.milvus.operations import (
     load_collection,
     milvus_connection_alias,
 )
-from fastapi import FastAPI
+from fastapi import FastAPI, status, Response
 
-from pymilvus import connections
+from pymilvus import connections, MilvusException
 
 model = {}
 top_re_rank = 5
@@ -52,6 +52,10 @@ def text_similarity_match(query: Query):
 def ping():
     return {"response": "Pong!"}
 
-@app.get("/healthz")
-def healthcheck():
-    connections.connect(alias=milvus_connection_alias) # alias makes sure pool isn't filled with random junk connections
+@app.get("/healthz", status_code=status.HTTP_204_NO_CONTENT)
+def healthcheck(response: Response):
+    try:
+        connections.connect(alias=milvus_connection_alias) # alias makes sure pool isn't filled with random junk connections
+    except MilvusException as e:
+        print("failed to maintain connection with milvus: ", e)
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
