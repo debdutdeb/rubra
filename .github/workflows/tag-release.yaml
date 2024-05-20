@@ -32,7 +32,7 @@ jobs:
 
       - name: Build and Push Docker Images
         run: |
-          TAG=${GITHUB_REF#refs/tags/} make build_and_push_images
+          TAG=${GITHUB_REF#refs/heads/} make build_and_push_images
         env:
           REGISTRY: ghcr.io
           ORG: ${{ github.repository_owner }}
