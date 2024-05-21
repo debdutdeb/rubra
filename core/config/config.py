@@ -58,9 +58,18 @@ def get_vector_db_url() -> str:
 
     host = getenv("VECTOR_DB_HOST", "localhost")
     port = getenv("VECTOR_DB_PORT", 8010)
-    name = getenv("VECTOR_DB_NAME", "similarity_search")
 
-    return f"http://{host}:{port}/{name}"
+    return f"http://{host}:{port}"
+
+def get_embedding_url():
+    url = getenv("EMBEDDING_URL")
+    if url:
+        return url
+
+    host = getenv("EMBEDDING_HOST", "localhost")
+    port = getenv("EMBEDDING_PORT", 8020)
+
+    return f"http://{host}:{port}"
 
 mongo_database = get_mongo_database_name()
 
@@ -71,3 +80,5 @@ litellm_url = get_litellm_url()
 vector_db_url = get_vector_db_url()
 
 redis_url = get_redis_url()
+
+embedding_url = get_embedding_url()
