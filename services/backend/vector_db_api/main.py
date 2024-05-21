@@ -16,6 +16,8 @@ from fastapi import FastAPI, status, Response
 
 from pymilvus import connections, MilvusException
 
+from core.config.utils import once
+
 model = {}
 top_re_rank = 5
 top_k_match = 10
@@ -51,11 +53,3 @@ def text_similarity_match(query: Query):
 @app.get("/ping")
 def ping():
     return {"response": "Pong!"}
-
-@app.get("/healthz", status_code=status.HTTP_204_NO_CONTENT)
-def healthcheck(response: Response):
-    try:
-        connections.connect(alias=milvus_connection_alias) # alias makes sure pool isn't filled with random junk connections
-    except MilvusException as e:
-        print("failed to maintain connection with milvus: ", e)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

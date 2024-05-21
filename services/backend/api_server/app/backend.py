@@ -109,6 +109,8 @@ from .helpers import (
 
 import core.config as configs
 
+from core.config.utils import once
+
 app = FastAPI()
 
 origins = [
@@ -1575,47 +1577,38 @@ async def chat_completion(body: CreateChatCompletionRequest):
     else:
         return response
 
-def _health_endpoint_wrapper(fn: Callable):
-    async def _health(response: Response):
-        try:
-            await redis.ping()
-            await mongo_client.admin.command("ping")
-
-            if asyncio.iscoroutinefunction(fn):
-                await fn()
-            else:
-                fn()
-        except Exception as e:
-            print("error checking for health:", e)
-            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-            return {"status": "not healthy"}
-
-    return _health
-
 @app.get("/healthz/readiness", status_code=status.HTTP_204_NO_CONTENT)
-@_health_endpoint_wrapper
-def is_litellm_ready() -> None:
-    print("Redis and MongoDB are connected and ready!")
+@once
+async def full_check(response: Response) -> Union[None, Dict[str, str]]:
+    try:
+        await redis.ping()
+        print("Redis connection is ready!")
 
-    response = requests.get(f"{LITELLM_URL}/health/readiness", { })
+        await mongo_client.admin.command("ping")
+        print("MongoDB connection is ready!")
 
-    if response.json().get("status", "") != "healthy":
-        raise Exception("litellm not ready: " + str(response.json()))
+        res = requests.get(f"{LITELLM_URL}/health/readiness", { })
 
-    # it is important to make sure auth is working
-    response = requests.get(f"{LITELLM_URL}/health", headers={ "Authorization": f"Bearer {LITELLM_MASTER_KEY}" })
+        if res.json().get("status", "") != "healthy":
+            raise Exception("litellm not ready: " + str(res.json()))
 
-    if not response.ok:
-        raise Exception("could not grab litellm health: "+response.text)
+        print("litellm is ready!")
 
+        # it is important to make sure auth is working
+        res = requests.get(f"{LITELLM_URL}/health", headers={ "Authorization": f"Bearer {LITELLM_MASTER_KEY}" })
+
+        if not res.ok:
+            raise Exception("could not grab litellm health: "+res.text)
+
+        print("litellm auth is working!")
+    except Exception as e:
+        print("error checking for health:", e)
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "not healthy"}
 
 @app.get("/healthz/liveness", status_code=status.HTTP_204_NO_CONTENT)
-@_health_endpoint_wrapper
-def is_litellm_healthy() -> None:
-    response = requests.get(f"{LITELLM_URL}/health/liveliness", { })
-
-    if response.text != "\"I'm alive!\"":
-        raise Exception("litellm not healthy: " + response.content.decode())
+def ping():
+    pass
 
 
 def data_generator(response):

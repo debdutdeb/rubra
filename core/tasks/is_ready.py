@@ -6,8 +6,11 @@ import requests
 
 from core.config import litellm_url, vector_db_url
 
+from core.config.utils import once
+
 import os
 
+@once
 def main():
     response = requests.get(f"{litellm_url}/health", headers={
         "Authorization": f"Bearer {os.getenv('LITELLM_MASTER_KEY', '')}"
