@@ -24,7 +24,7 @@ def main():
     print(response)
 
     pong = app.control.ping([f'celery@{socket.gethostname()}'])
-    if len(pong) == 0 or pong[0].get('ok', None) is None:
+    if len(pong) == 0 or list(pong[0].values())[0].get('ok', None) is None:
         raise Exception('ping failed with' + str(pong))
 
     print(pong)
