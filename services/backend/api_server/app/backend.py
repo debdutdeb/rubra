@@ -132,7 +132,7 @@ HEADERS = {"accept": "application/json", "Content-Type": "application/json"}
 
 # Initialize MongoDB client
 mongo_client = AsyncIOMotorClient(configs.mongo_url, server_api=ServerApi("1"))
-database = mongo_client[configs.mongo_url]
+database = mongo_client[configs.mongo_database]
 
 celery_app = Celery(configs.redis_url)
 
