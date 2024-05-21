@@ -34,7 +34,7 @@ def get_redis_url() -> str:
     password = getenv("REDIS_PASS", getenv("REDIS_PASSWORD", None))
     user = getenv("REDIS_USER", getenv("REDIS_USERNAME", None))
     port = getenv("REDIS_PORT", 6379)
-    database = getenv("REDIS_DATABASE", "rubra")
+    database = getenv("REDIS_DATABASE", 0)
 
     if password:
         return f"redis://{user or ''}:{password}@{host}:{port}/{database}"
@@ -46,8 +46,8 @@ def get_litellm_url() -> str:
     if url:
         return url
 
-    host = getenv("LITELLM_HOST")
-    port = getenv("LITELLM_PORT")
+    host = getenv("LITELLM_HOST", "localhost")
+    port = getenv("LITELLM_PORT", 8002)
 
     return f"http://{host}:{port}"
 

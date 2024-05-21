@@ -7,6 +7,14 @@ from functools import partial
 
 from typing import cast
 
+# Third Party
+from core.tools.knowledge.vector_db.milvus.operations import add_texts, milvus_connection_alias
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from core.tools.knowledge.file_knowledge_tool import FileKnowledgeTool
+from core.tools.web_browse.web_browse_tool import WebBrowseTool
+
+from pymilvus import connections
+
 # Get the current working directory
 current_directory = os.getcwd()
 
@@ -38,7 +46,6 @@ import core.config as configs
 redis_client = cast(redis.Redis, redis.Redis.from_url(configs.redis_url)) # annoyingly from_url returns None, not Self
 app = Celery("tasks", broker=configs.redis_url)
 
-app.config_from_object("core.tasks.celery_config")
 app.autodiscover_tasks(["core.tasks"])  # Explicitly discover tasks in 'app' package
 
 # Global MongoDB client
@@ -46,12 +53,11 @@ mongo_client: MongoClient
 
 
 @signals.worker_process_init.connect
-async def setup_mongo_connection(*args, **kwargs):
+async def ensure_connections(*args, **kwargs):
     global mongo_client
     mongo_client = MongoClient(configs.mongo_url)
 
-    mongo_client.admin.command("ping")
-    await redis_client.ping()
+    mongo_client.admin.command('ping')
 
 def create_assistant_message(
     thread_id, assistant_id, run_id, content_text, role=Role7.assistant.value
@@ -174,10 +180,6 @@ def rubra_local_agent_chat_completion(
 
 
 def form_openai_tools(tools, assistant_id: str):
-    # Third Party
-    from core.tools.knowledge.file_knowledge_tool import FileKnowledgeTool
-    from core.tools.web_browse.web_browse_tool import WebBrowseTool
-
     retrieval = FileKnowledgeTool()
     googlesearch = WebBrowseTool()
     res_tools = []
@@ -452,13 +454,6 @@ def execute_chat_completion(assistant_id, thread_id, redis_channel, run_id):
 
 @app.task
 def execute_asst_file_create(file_id: str, assistant_id: str):
-    # Standard Library
-    import json
-
-    # Third Party
-    from core.tools.knowledge.vector_db.milvus.operations import add_texts
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-
     try:
         db = mongo_client[configs.mongo_database]
         collection_name = assistant_id
