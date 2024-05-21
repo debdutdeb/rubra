@@ -1,10 +1,10 @@
 from os import getenv
 
 def get_mongo_database_name():
-    return getenv("MONGO_DATABASE", "rubra_db")
+    return getenv("MONGODB_DATABASE", "rubra_db")
 
 def get_mongo_url() -> str:
-    url = getenv("MONGO_URL")
+    url = getenv("MONGODB_URL")
     if url:
         return url
 
@@ -12,7 +12,7 @@ def get_mongo_url() -> str:
     user = getenv("MONGODB_USER", getenv("MONGODB_USERNAME", None))
     password = getenv("MONGODB_PASS", getenv("MONGODB_PASSWORD", None))
     port = getenv("MONGODB_PORT", 27017)
-    database = getenv("MONGODB_DATABASE", "rubra")
+    database = get_mongo_database_name()
 
     if user and not password:
         print("MONGODB_USER set but password not found, ignoring user")

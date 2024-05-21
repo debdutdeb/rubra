@@ -1595,6 +1595,8 @@ def _health_endpoint_wrapper(fn: Callable):
 @app.get("/healthz/readiness", status_code=status.HTTP_204_NO_CONTENT)
 @_health_endpoint_wrapper
 def is_litellm_ready() -> None:
+    print("Redis and MongoDB are connected and ready!")
+
     response = requests.get(f"{LITELLM_URL}/health/readiness", { })
 
     if response.json().get("status", "") != "healthy":
