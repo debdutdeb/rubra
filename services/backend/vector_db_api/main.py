@@ -16,8 +16,6 @@ from fastapi import FastAPI, status, Response
 
 from pymilvus import connections, MilvusException
 
-from core.config.utils import once
-
 model = {}
 top_re_rank = 5
 top_k_match = 10

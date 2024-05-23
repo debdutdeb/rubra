@@ -109,8 +109,6 @@ from .helpers import (
 
 import core.config as configs
 
-from core.config.utils import once
-
 app = FastAPI()
 
 origins = [
@@ -145,6 +143,28 @@ logging.basicConfig(level=logging.INFO)
 def get_database():
     return database
 
+async def full_check() -> None:
+    await redis.ping()
+    print("Redis connection is ready!")
+
+    await mongo_client.admin.command("ping")
+    print("MongoDB connection is ready!")
+
+    res = requests.get(f"{LITELLM_URL}/health/readiness", { })
+
+    if res.json().get("status", "") != "healthy":
+        raise Exception("litellm not ready: " + str(res.json()))
+
+    print("litellm is ready!")
+
+    # it is important to make sure auth is working
+    res = requests.get(f"{LITELLM_URL}/health", headers={ "Authorization": f"Bearer {LITELLM_MASTER_KEY}" })
+
+    if not res.ok:
+        raise Exception("could not grab litellm health: "+res.text)
+
+    print("litellm auth is working!")
+
 @app.on_event("startup")
 async def on_startup():
     await init_beanie(
@@ -159,6 +179,8 @@ async def on_startup():
             AssistantFileObject,
         ],
     )
+
+    await full_check()
 
     available_models = [r.id for r in litellm_list_model().data]
     if not available_models:
@@ -181,24 +203,24 @@ async def on_startup():
         welcome_asst_instruction += tool_use_instruction
 
     # Create the Welcome Assistant if it doesn't exist
-    existing_assistant = await AssistantObject.find_one({"id": "asst_welcome"})
-    if not existing_assistant:
-        logging.info("Creating Welcome Assistant")
-        assistant = AssistantObject(
-            assistant_id="asst_welcome",
-            object=Object20.assistant.value,
-            created_at=int(datetime.now().timestamp()),
-            name="Welcome Assistant",
-            description="Welcome Assistant",
-            model=welcome_asst_model,
-            instructions=welcome_asst_instruction,
-            tools=[{"type": Type824.retrieval.value}]
-            if welcome_asst_model in tool_enabled_model_pool
-            else [],  # browser
-            file_ids=[],
-            metadata={},
-        )
-        await assistant.insert()
+    # existing_assistant = await AssistantObject.find_one({"id": "asst_welcome"})
+    # if not existing_assistant:
+    #     logging.info("Creating Welcome Assistant")
+    #     assistant = AssistantObject(
+    #         assistant_id="asst_welcome",
+    #         object=Object20.assistant.value,
+    #         created_at=int(datetime.now().timestamp()),
+    #         name="Welcome Assistant",
+    #         description="Welcome Assistant",
+    #         model=welcome_asst_model,
+    #         instructions=welcome_asst_instruction,
+    #         tools=[{"type": Type824.retrieval.value}]
+    #         if welcome_asst_model in tool_enabled_model_pool
+    #         else [],  # browser
+    #         file_ids=[],
+    #         metadata={},
+    #     )
+    #     await assistant.insert()
 
 
 @app.get("/get_api_key_status", tags=["API Keys"])
@@ -1576,35 +1598,6 @@ async def chat_completion(body: CreateChatCompletionRequest):
         )
     else:
         return response
-
-@app.get("/healthz/readiness", status_code=status.HTTP_204_NO_CONTENT)
-@once
-async def full_check(response: Response) -> Union[None, Dict[str, str]]:
-    try:
-        await redis.ping()
-        print("Redis connection is ready!")
-
-        await mongo_client.admin.command("ping")
-        print("MongoDB connection is ready!")
-
-        res = requests.get(f"{LITELLM_URL}/health/readiness", { })
-
-        if res.json().get("status", "") != "healthy":
-            raise Exception("litellm not ready: " + str(res.json()))
-
-        print("litellm is ready!")
-
-        # it is important to make sure auth is working
-        res = requests.get(f"{LITELLM_URL}/health", headers={ "Authorization": f"Bearer {LITELLM_MASTER_KEY}" })
-
-        if not res.ok:
-            raise Exception("could not grab litellm health: "+res.text)
-
-        print("litellm auth is working!")
-    except Exception as e:
-        print("error checking for health:", e)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "not healthy"}
 
 @app.get("/healthz/liveness", status_code=status.HTTP_204_NO_CONTENT)
 def ping():

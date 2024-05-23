@@ -43,6 +43,8 @@ from pymongo import MongoClient
 
 import core.config as configs
 
+from .is_ready import is_ready
+
 redis_client = cast(redis.Redis, redis.Redis.from_url(configs.redis_url)) # annoyingly from_url returns None, not Self
 app = Celery("tasks", broker=configs.redis_url)
 
@@ -58,6 +60,8 @@ async def ensure_connections(*args, **kwargs):
     mongo_client = MongoClient(configs.mongo_url)
 
     mongo_client.admin.command('ping')
+
+    is_ready()
 
 def create_assistant_message(
     thread_id, assistant_id, run_id, content_text, role=Role7.assistant.value
