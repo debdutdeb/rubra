@@ -10,11 +10,8 @@ from core.tools.knowledge.vector_db.milvus.operations import (
     drop_collection,
     get_similar_match,
     load_collection,
-    milvus_connection_alias,
 )
 from fastapi import FastAPI, status, Response
-
-from pymilvus import connections, MilvusException
 
 model = {}
 top_re_rank = 5

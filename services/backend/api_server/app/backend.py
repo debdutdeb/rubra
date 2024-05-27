@@ -157,13 +157,6 @@ async def full_check() -> None:
 
     print("litellm is ready!")
 
-    # it is important to make sure auth is working
-    res = requests.get(f"{LITELLM_URL}/health", headers={ "Authorization": f"Bearer {LITELLM_MASTER_KEY}" })
-
-    if not res.ok:
-        raise Exception("could not grab litellm health: "+res.text)
-
-    print("litellm auth is working!")
 
 @app.on_event("startup")
 async def on_startup():
