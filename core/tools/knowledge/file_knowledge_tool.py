@@ -6,7 +6,7 @@ import core.config as configs
 # Third Party
 import requests
 
-vector_db_url = f"{configs.vector_db_url}/similarity_search"
+vector_db_url = f"{configs.vector_db_url}/similarity_match"
 
 class FileKnowledgeTool:
     name = "FileKnowledge"

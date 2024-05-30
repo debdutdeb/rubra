@@ -44,18 +44,15 @@ from pymongo import MongoClient
 import core.config as configs
 
 from .is_ready import is_ready
-
-redis_client = cast(redis.Redis, redis.Redis.from_url(configs.redis_url)) # annoyingly from_url returns None, not Self
-app = Celery("tasks", broker=configs.redis_url)
-
-app.autodiscover_tasks(["core.tasks"])  # Explicitly discover tasks in 'app' package
+from .celery_app import app
 
 # Global MongoDB client
-mongo_client: MongoClient
+mongo_client: MongoClient = None
 
+redis_client = cast(redis.Redis, redis.Redis.from_url(configs.redis_url)) # annoyingly from_url returns None, not Self
 
 @signals.worker_process_init.connect
-async def ensure_connections(*args, **kwargs):
+def ensure_connections(*args, **kwargs):
     global mongo_client
     mongo_client = MongoClient(configs.mongo_url)
 
@@ -220,11 +217,12 @@ def form_openai_tools(tools, assistant_id: str):
 @shared_task
 def execute_chat_completion(assistant_id, thread_id, redis_channel, run_id):
     try:
+        db = mongo_client[configs.mongo_database] # OpenAI call can fail, so we need to get the db again
+
         oai_client = OpenAI(
             base_url=configs.litellm_url,
             api_key=os.getenv("LITELLM_MASTER_KEY"),  # point to litellm server
         )
-        db = mongo_client[configs.mongo_database]
 
         # Fetch assistant and thread messages synchronously
         assistant = db.assistants.find_one({"id": assistant_id})
@@ -459,6 +457,8 @@ def execute_chat_completion(assistant_id, thread_id, redis_channel, run_id):
 @app.task
 def execute_asst_file_create(file_id: str, assistant_id: str):
     try:
+        if mongo_client is None:
+            raise Exception("MongoDB client not initialized yet")
         db = mongo_client[configs.mongo_database]
         collection_name = assistant_id
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)

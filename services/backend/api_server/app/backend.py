@@ -127,16 +127,16 @@ app.add_middleware(
 
 # MongoDB Configurationget
 LITELLM_URL = configs.litellm_url
-LITELLM_MASTER_KEY = os.getenv("LITELLM_MASTER_KEY", "")
+LITELLM_MASTER_KEY = os.getenv("LITELLM_MASTER_KEY", "abc") # Litellm fails without this key
 HEADERS = {"accept": "application/json", "Content-Type": "application/json"}
 
 # Initialize MongoDB client
 mongo_client = AsyncIOMotorClient(configs.mongo_url, server_api=ServerApi("1"))
 database = mongo_client[configs.mongo_database]
 
-celery_app = Celery(configs.redis_url)
+celery_app = Celery(broker=configs.redis_url)
 
-redis = aioredis.from_url(configs.redis_url)
+redis = aioredis.from_url(configs.redis_url, encoding="utf-8", decode_responses=True)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -763,6 +763,14 @@ async def redis_subscriber(channel, timeout=1):
     logging.info(f"Connecting to Redis and subscribing to channel: {channel}")
     pubsub = redis.pubsub()
     await pubsub.subscribe(channel)
+
+    # Check if the subscription was successful
+    channels = await redis.pubsub_channels()
+    logging.info(f"Channels: {channels}")
+    if channel in channels:
+        logging.info(f"Successfully subscribed to channel: {channel}")
+    else:
+        logging.error(f"Failed to subscribe to channel: {channel}")
 
     while True:
         try:
