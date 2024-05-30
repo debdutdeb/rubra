@@ -1,10 +1,10 @@
-from .tasks import app
-
 import socket
 
 import requests
 
 from core.config import litellm_url, vector_db_url
+
+from .celery_app import app
 
 def is_ready():
     # response = requests.get(f"{litellm_url}/health", headers={
