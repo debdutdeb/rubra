@@ -131,10 +131,14 @@ LITELLM_MASTER_KEY = os.getenv("LITELLM_MASTER_KEY", "")
 HEADERS = {"accept": "application/json", "Content-Type": "application/json"}
 
 # Initialize MongoDB client
-mongo_client = AsyncIOMotorClient(configs.mongo_url, server_api=ServerApi("1"))
+mongo_client = AsyncIOMotorClient(configs.mongo_url)
 database = mongo_client[configs.mongo_database]
 
-celery_app = Celery(configs.redis_url)
+celery_app = Celery(broker=configs.redis_url)
+
+print(configs.redis_url)
+
+print(celery_app.control.ping())
 
 redis = aioredis.from_url(configs.redis_url)
 
@@ -176,6 +180,7 @@ async def on_startup():
     await full_check()
 
     available_models = [r.id for r in litellm_list_model().data]
+    print(available_models)
     if not available_models:
         logging.warning("No models configured.")
         return
@@ -1031,7 +1036,7 @@ def litellm_list_model() -> ListModelsResponse:
         models_data = sorted(models_data, key=lambda x: x.id)
         predefined_models = [convert_to_model(m) for m in models_data]
 
-        models_data = requests.get(f"{LITELLM_URL}/model/info").json().get("data", [])
+        models_data = requests.get(f"{LITELLM_URL}/model/info", headers={"Authorization": f"Bearer {LITELLM_MASTER_KEY}"}).json().get("data", [])
         models = [
             convert_model_info_to_oai_model(m, predefined_models) for m in models_data
         ]
@@ -1546,7 +1551,7 @@ async def get_run_step(
     tags=["chat/completions"],
 )
 async def chat_completion(body: CreateChatCompletionRequest):
-    client = OpenAI(base_url=LITELLM_URL, api_key="abc")
+    client = OpenAI(base_url=LITELLM_URL, api_key=LITELLM_MASTER_KEY)
     chat_messages = [
         {"role": m.__root__.role.value, "content": m.__root__.content}
         for m in body.messages

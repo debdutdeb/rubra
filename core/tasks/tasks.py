@@ -5,7 +5,7 @@ import os
 import sys
 from functools import partial
 
-from typing import cast
+from typing import cast, Any
 
 # Third Party
 from core.tools.knowledge.vector_db.milvus.operations import add_texts, milvus_connection_alias
@@ -51,17 +51,23 @@ app = Celery("tasks", broker=configs.redis_url)
 app.autodiscover_tasks(["core.tasks"])  # Explicitly discover tasks in 'app' package
 
 # Global MongoDB client
-mongo_client: MongoClient
+mongo_client: MongoClient = MongoClient(configs.mongo_url)
+
+def ping_pong():
+    pong = app.control.ping([f'celery@{socket.gethostname()}'])
+    if len(pong) == 0 or list(pong[0].values())[0].get('ok', None) is None:
+        raise Exception('ping failed with' + str(pong))
+
+    print(pong)
 
 
 @signals.worker_process_init.connect
 async def ensure_connections(*args, **kwargs):
-    global mongo_client
-    mongo_client = MongoClient(configs.mongo_url)
-
     mongo_client.admin.command('ping')
 
     is_ready()
+
+    ping_pong()
 
 def create_assistant_message(
     thread_id, assistant_id, run_id, content_text, role=Role7.assistant.value
@@ -219,13 +225,13 @@ def form_openai_tools(tools, assistant_id: str):
 
 @shared_task
 def execute_chat_completion(assistant_id, thread_id, redis_channel, run_id):
+    db = mongo_client[configs.mongo_database]
     try:
         oai_client = OpenAI(
             base_url=configs.litellm_url,
             api_key=os.getenv("LITELLM_MASTER_KEY"),  # point to litellm server
         )
-        db = mongo_client[configs.mongo_database]
-
+        print(oai_client.models.list().data)
         # Fetch assistant and thread messages synchronously
         assistant = db.assistants.find_one({"id": assistant_id})
         thread_messages = list(db.messages.find({"thread_id": thread_id}))

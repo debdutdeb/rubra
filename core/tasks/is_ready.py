@@ -1,5 +1,3 @@
-from .tasks import app
-
 import socket
 
 import requests
@@ -20,12 +18,6 @@ def is_ready():
         raise Exception(response.text)
 
     print(response)
-
-    pong = app.control.ping([f'celery@{socket.gethostname()}'])
-    if len(pong) == 0 or list(pong[0].values())[0].get('ok', None) is None:
-        raise Exception('ping failed with' + str(pong))
-
-    print(pong)
 
     response = requests.get(f"{vector_db_url}/healthz")
     if not response.ok:
